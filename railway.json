@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 {
   "startCommand": "php artisan serve --host=0.0.0.0 --port=$PORT"
 }
+=======
+{
+  "startCommand": "php artisan serve --host=0.0.0.0 --port=$PORT"
+}
+>>>>>>> ab345dac9b088515a2b8a57a836e9d18923d366f
