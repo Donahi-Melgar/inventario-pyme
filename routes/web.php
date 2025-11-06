@@ -1,21 +1,28 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\MovimientoController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\InsumoController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login.show');
 });
 
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+// Auth
+Route::get('/login', [AuthController::class, 'showLogin'])->name('login.show');
+Route::post('/login', [AuthController::class, 'login'])->name('login.perform');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::resource('productos', ProductoController::class);
-Route::get('productos/export/excel', [ProductoController::class, 'exportExcel'])->name('productos.export.excel');
-Route::get('productos/export/pdf', [ProductoController::class, 'exportPDF'])->name('productos.export.pdf');
+// Protected routes - requiere autenticación
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
-Route::resource('movimientos', MovimientoController::class);
+    // Productos: acceso general para ver/listar/crear/editar; eliminación solo admin
+    Route::resource('productos', ProductoController::class)->except(['destroy']);
+    Route::delete('productos/{producto}', [ProductoController::class, 'destroy'])->name('productos.destroy')->middleware('role:admin');
 
-Route::get('/insumos', [InsumoController::class, 'index'])->name('insumos.index');
+    // Movimiento de inventario (entradas/salidas) permitidos a admin y empleado
+    Route::resource('movimientos', MovimientoController::class)->middleware('role:admin,empleado');
+});

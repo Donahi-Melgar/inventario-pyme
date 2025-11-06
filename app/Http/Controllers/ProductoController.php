@@ -4,98 +4,92 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Producto;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ProductosExport;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class ProductoController extends Controller
 {
+    /**
+     * Mostrar lista de productos.
+     */
     public function index(Request $request)
     {
-        $buscar = $request->input('buscar');
-        $proveedorSeleccionado = $request->input('proveedor');
-
+        $q = $request->get('q');
         $query = Producto::query();
 
-        if ($buscar) {
-            $query->where(function ($q) use ($buscar) {
-                $q->where('nombre', 'like', "%$buscar%")
-                  ->orWhere('sku', 'like', "%$buscar%");
+        if ($q) {
+            $query->where(function ($sub) {
+                $q = request('q');
+                $sub->where('nombre', 'like', "%{$q}%")
+                    ->orWhere('sku', 'like', "%{$q}%");
             });
         }
 
-        if ($proveedorSeleccionado) {
-            $query->where('proveedor', $proveedorSeleccionado);
-        }
-
-        $productos = $query->orderBy('id', 'desc')->paginate(10);
-        $proveedores = Producto::distinct()->pluck('proveedor');
-
-        return view('productos.index', compact('productos', 'proveedores', 'proveedorSeleccionado'));
+        $productos = $query->orderBy('nombre')->paginate(10);
+        return view('productos.index', compact('productos'));
     }
 
+    /**
+     * Mostrar formulario para crear un nuevo producto.
+     */
     public function create()
     {
         return view('productos.create');
     }
 
+    /**
+     * Guardar un nuevo producto en la base de datos.
+     */
     public function store(Request $request)
     {
         $request->validate([
             'nombre' => 'required|string|max:100',
-            'sku' => 'required|string|unique:productos',
+            'sku' => 'required|string|max:50|unique:productos,sku',
             'cantidad' => 'required|integer|min:0',
+            'stock_minimo' => 'required|integer|min:0',
             'precio' => 'required|numeric|min:0',
-            'proveedor' => 'required|string|max:100',
+            'proveedor' => 'nullable|string|max:100',
         ]);
 
         Producto::create($request->all());
 
-        return redirect()->route('productos.index')->with('success', 'Producto registrado correctamente.');
+        return redirect()->route('productos.index')
+                         ->with('success', 'Producto registrado correctamente.');
     }
 
-    public function edit($id)
+    /**
+     * Mostrar formulario para editar un producto existente.
+     */
+    public function edit(Producto $producto)
     {
-        $producto = Producto::findOrFail($id);
         return view('productos.edit', compact('producto'));
     }
 
-    public function update(Request $request, $id)
+    /**
+     * Actualizar los datos de un producto existente.
+     */
+    public function update(Request $request, Producto $producto)
     {
-        $producto = Producto::findOrFail($id);
-
         $request->validate([
             'nombre' => 'required|string|max:100',
-            'sku' => 'required|string|unique:productos,sku,' . $producto->id,
+            'sku' => 'required|string|max:50|unique:productos,sku,' . $producto->id,
             'cantidad' => 'required|integer|min:0',
+            'stock_minimo' => 'required|integer|min:0',
             'precio' => 'required|numeric|min:0',
-            'proveedor' => 'required|string|max:100',
+            'proveedor' => 'nullable|string|max:100',
         ]);
 
         $producto->update($request->all());
 
-        return redirect()->route('productos.index')->with('success', 'Producto actualizado correctamente.');
+        return redirect()->route('productos.index')
+                         ->with('success', 'Producto actualizado correctamente.');
     }
 
-    public function destroy($id)
+    /**
+     * Eliminar un producto (solo admin).
+     */
+    public function destroy(Producto $producto)
     {
-        $producto = Producto::findOrFail($id);
         $producto->delete();
-
-        return redirect()->route('productos.index')->with('success', 'Producto eliminado correctamente.');
-    }
-
-    // ✅ Exportar a Excel
-    public function exportExcel()
-    {
-        return Excel::download(new ProductosExport, 'productos.xlsx');
-    }
-
-    // ✅ Exportar a PDF
-    public function exportPdf()
-    {
-        $productos = Producto::orderBy('id', 'desc')->get();
-        $pdf = Pdf::loadView('productos.pdf', compact('productos'));
-        return $pdf->download('productos.pdf');
+        return redirect()->route('productos.index')
+                         ->with('success', 'Producto eliminado correctamente.');
     }
 }
